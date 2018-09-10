@@ -13,7 +13,13 @@
 *   Villi Includes
 */
 #include <string>
-
+#include<netinet/ip_icmp.h>   
+#include<netinet/udp.h>   
+#include<netinet/tcp.h>   
+#include<netinet/ip.h>    
+#include<sys/socket.h>
+#include<arpa/inet.h>
+#include<chrono>
 
 // villi includes - END
 
@@ -24,6 +30,7 @@
 
 // Ívar includes - END
 
+void triple(int *portno, const char *host_name);
 
 void error(const char *msg)
 {
@@ -85,38 +92,36 @@ int main(int argc, char *argv[])
 
 void *process_thread(void *host, void *portno, void *action) {
   const char *host_name = (const char *) host;
-  int *portno = (int *) portno;
+  int *port = (int *) portno;
   char *act = (char *) action;
 
-  switch (act) {
+  switch (*act) {
     case 't':
-      triple(*portno, *host);
+      triple(port, host_name);
       break;
     case 'u':
       // setja UDP hér
       break;
-    case: 's':
+    case 's':
       // setja SYN hér
       break;
     default:
       error("cannot find action!");
   }
 
-  return NULL
+  return NULL;
 }
 
 void triple(int *portno, const char *host_name) {
   /*
     Initizialise variables
   */
+  const char *host = (const char *) host_name;
+  int sockfd;
   struct sockaddr_in serv_addr, socket_addr;           // Socket address structure
   struct hostent *server;
 
   char buffer[256];
-  if (argc < 3) {
-     fprintf(stderr,"usage %s hostname port\n", argv[0]);
-     exit(0);
-  }
 
   //loop_test_count = 0;
   sockfd = socket(AF_INET, SOCK_STREAM, 0); // Open Socket
@@ -124,7 +129,7 @@ void triple(int *portno, const char *host_name) {
   if (sockfd < 0)
     error("ERROR opening socket");
 
-  server = gethostbyname(host_name);        // Get host from IP
+  server = gethostbyname(host);        // Get host from IP
 
   if (server == NULL) {
     fprintf(stderr,"ERROR, no such host\n");
@@ -141,15 +146,11 @@ void triple(int *portno, const char *host_name) {
         server->h_length);
 
 
-  serv_addr.sin_port = htons(portno);
+  serv_addr.sin_port = htons(*portno);
 
   if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) >= 0) {
-      printf("Port %d IS open\n", portno);
+      printf("Port %d IS open\n", *portno);
   }
-
-  port_map[portno] = true;
-  ports_counted--;
-  portno = begin_port + (rand() % static_cast<int>(end_port - begin_port + 1));
 
   // Set sleep on
   //usleep(sleeptime);
@@ -162,7 +163,3 @@ void triple(int *portno, const char *host_name) {
 
 
 
-
-/*****************************
- *  ÍVAR workspace  VVVVV
- **************************** /
