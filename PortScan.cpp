@@ -12,6 +12,7 @@
 /*
 *   Villi Includes
 */
+#include <string>
 
 
 // villi includes - END
@@ -38,6 +39,7 @@ int main(int argc, char *argv[])
     /*
       Initizialise variables
     */
+
     int sockfd, portno, n;
     struct sockaddr_in serv_addr, socket_addr;           // Socket address structure
     struct hostent *server;
@@ -69,60 +71,95 @@ int main(int argc, char *argv[])
         portno = begin_port + (rand() % static_cast<int>(end_port - begin_port + 1));
         continue;
       }
-      //loop_test_count = 0;
-      sockfd = socket(AF_INET, SOCK_STREAM, 0); // Open Socket
 
-      if (sockfd < 0)
-          error("ERROR opening socket");
-
-      server = gethostbyname(argv[1]);        // Get host from IP
-
-      if (server == NULL) {
-          fprintf(stderr,"ERROR, no such host\n");
-          exit(0);
-      }
-
-      bzero((char *) &serv_addr, sizeof(serv_addr));
-
-      serv_addr.sin_family = AF_INET; // This is always set to AF_INET
-
-      // Host address is stored in network byte order
-      bcopy((char *)server->h_addr,
-           (char *)&serv_addr.sin_addr.s_addr,
-           server->h_length);
-
-
-      serv_addr.sin_port = htons(portno);
-
-      if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) >= 0) {
-          printf("Port %d IS open\n", portno);
-      }
-
-      port_map[portno] = true;
-      ports_counted--;
-      portno = begin_port + (rand() % static_cast<int>(end_port - begin_port + 1));
+      // setja þræði hér
 
       // Set sleep on
       //usleep(sleeptime);
 
-      close(sockfd);
     }
 
     return 0;
 }
 
-
-
-
-
 /*****************************
 *   Villi workspace VVVVVV
 ******************************/
 
+void *process_thread(void *host, void *portno, void *action) {
+  const char *host_name = (const char *) host;
+  int *portno = (int *) portno;
+  char *act = (char *) action;
+
+  switch (act) {
+    case 't':
+      triple(*portno, *host);
+      break;
+    case 'u':
+      // setja UDP hér
+      break;
+    case: 's':
+      // setja SYN hér
+      break;
+    default:
+      error("cannot find action!");
+  }
+
+  return NULL
+}
+
+void triple(int *portno, const char *host_name) {
+  /*
+    Initizialise variables
+  */
+  struct sockaddr_in serv_addr, socket_addr;           // Socket address structure
+  struct hostent *server;
+
+  char buffer[256];
+  if (argc < 3) {
+     fprintf(stderr,"usage %s hostname port\n", argv[0]);
+     exit(0);
+  }
+
+  //loop_test_count = 0;
+  sockfd = socket(AF_INET, SOCK_STREAM, 0); // Open Socket
+
+  if (sockfd < 0)
+    error("ERROR opening socket");
+
+  server = gethostbyname(host_name);        // Get host from IP
+
+  if (server == NULL) {
+    fprintf(stderr,"ERROR, no such host\n");
+    exit(0);
+  }
+
+  bzero((char *) &serv_addr, sizeof(serv_addr));
+
+  serv_addr.sin_family = AF_INET; // This is always set to AF_INET
+
+  // Host address is stored in network byte order
+  bcopy((char *)server->h_addr,
+        (char *)&serv_addr.sin_addr.s_addr,
+        server->h_length);
 
 
+  serv_addr.sin_port = htons(portno);
 
+  if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) >= 0) {
+      printf("Port %d IS open\n", portno);
+  }
 
+  port_map[portno] = true;
+  ports_counted--;
+  portno = begin_port + (rand() % static_cast<int>(end_port - begin_port + 1));
+
+  // Set sleep on
+  //usleep(sleeptime);
+
+  close(sockfd);
+
+}
 
 
 /*****************************
@@ -198,3 +235,6 @@ void upd(struct hostent *server, int *portNumber) {
     close(sockfd2);
 }
 
+/*****************************
+ *  ÍVAR workspace  VVVVV
+ **************************** /
