@@ -13,13 +13,14 @@
 *   Villi Includes
 */
 #include <string>
-#include<netinet/ip_icmp.h>   
-#include<netinet/udp.h>   
-#include<netinet/tcp.h>   
-#include<netinet/ip.h>    
+#include<netinet/ip_icmp.h>
+#include<netinet/udp.h>
+#include<netinet/tcp.h>
+#include<netinet/ip.h>
 #include<sys/socket.h>
 #include<arpa/inet.h>
 #include<chrono>
+#include<pthread.h>
 
 // villi includes - END
 
@@ -53,6 +54,7 @@ int main(int argc, char *argv[])
     int begin_port = 1025;
     int end_port = 60000;
     unsigned int sleeptime = 500000;
+    int port_count;
 
     // bool hash map for which ports are finished
     std::map<int, bool> port_map;
@@ -63,6 +65,11 @@ int main(int argc, char *argv[])
       begin_port = atoi(argv[2]);
       end_port = atoi(argv[3]);
     }
+
+    port_count = end_port - begin_port;
+
+    //Init threads
+    pthread thread_arr[port_count];
 
     char buffer[256];
     if (argc < 3) {
@@ -80,10 +87,15 @@ int main(int argc, char *argv[])
       }
 
       // setja þræði hér
+      pthread_create(thread_arr[portno], NULL, process_thread(&argv[1], &portno, &argv[4]));
 
       // Set sleep on
       //usleep(sleeptime);
 
+    }
+
+    for (int i = 0; i < port_count; i++) {
+      pthread_join(threads[i], NULL);
     }
 
     return 0;
@@ -178,7 +190,7 @@ void upd(struct hostent *server, int *portNumber) {
     // ATH
     struct icmphdr *recv = (struct icmphdr*) (buffer + sizeof(struct iphdr));
     socklen_t addr_len;
-    
+
     //get host info
     /*if((he = gethostbyname(server) == NULL) {
         herror("gethostbyname");
@@ -196,7 +208,7 @@ void upd(struct hostent *server, int *portNumber) {
         printf("in socket 2 error begin");
         exit(1);
     }
-    
+
     //portnumber
     int portnum = *portNumber;
     // host byte order
@@ -216,7 +228,7 @@ void upd(struct hostent *server, int *portNumber) {
     printf("sent %d bytes to %s\n", bytes_sent, inet_ntoa(their_addr.sin_addr));
 
     for(int i = 0; i <= 5; i++) {
-        //here is sockfd2 used                                                                                
+        //here is sockfd2 used
         bytes_recv = recvfrom(sockfd2, buffer, 65536, 0,(struct sockaddr *)&their_addr, &addr_len);
         if(bytes_recv < 0) {
             printf("Port %d is open\n", portnum);
@@ -235,4 +247,3 @@ void upd(struct hostent *server, int *portNumber) {
     close(sockfd);
     close(sockfd2);
 }
-
