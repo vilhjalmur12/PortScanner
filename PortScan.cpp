@@ -13,14 +13,14 @@
 *   Villi Includes
 */
 #include <string>
-#include<netinet/ip_icmp.h>
-#include<netinet/udp.h>
-#include<netinet/tcp.h>
-#include<netinet/ip.h>
-#include<sys/socket.h>
-#include<arpa/inet.h>
-#include<chrono>
-#include<pthread.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/udp.h>
+#include <netinet/tcp.h>
+#include <netinet/ip.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <chrono>
+#include <pthread.h>
 
 // villi includes - END
 
@@ -35,12 +35,21 @@
 // Ívar includes - END
 
 void triple(int *portno, const char *host_name);
+//void *process_thread(void *host, void *portno, void *action);
+void process(const char *host_name, int port, char act);
+
 
 void error(const char *msg)
 {
     perror(msg);
     exit(0);
 }
+
+struct arg_struct {
+  int portno;
+  std::string host;
+  char action;
+};
 
 int main(int argc, char *argv[])
 {
@@ -69,7 +78,7 @@ int main(int argc, char *argv[])
     port_count = end_port - begin_port;
 
     //Init threads
-    pthread thread_arr[port_count];
+    pthread_t thread_arr[port_count];
 
     char buffer[256];
     if (argc < 3) {
@@ -78,6 +87,9 @@ int main(int argc, char *argv[])
     }
 
     portno = end_port;
+    std::string hostn = argv[1];
+    char *action = argv[4];
+    
 
     while ((end_port - begin_port) > (port_map.size())) {
 
@@ -86,18 +98,29 @@ int main(int argc, char *argv[])
         continue;
       }
 
-      // setja þræði hér
-      pthread_create(thread_arr[portno], NULL, process_thread(&argv[1], &portno, &argv[4]));
+      process(argv[1], portno, *argv[4]);
 
-      // Set sleep on
-      //usleep(sleeptime);
+      /* þræðir eru í bullinu
+      struct arg_struct *args = new struct arg_struct();
+      args->portno = portno;
+      args->action = *action;
+      args->host = hostn;
+
+      pthread_create(&thread_arr[portno], NULL, process_thread ,(void *)&args);
+
+      */
+
+      port_map[portno] = true;
+      ports_counted--;
+      portno = begin_port + (rand() % static_cast<int>(end_port - begin_port + 1));
 
     }
 
+  /*
     for (int i = 0; i < port_count; i++) {
-      pthread_join(threads[i], NULL);
+      pthread_join(thread_arr[i], NULL);
     }
-
+  */
     return 0;
 }
 
@@ -105,10 +128,30 @@ int main(int argc, char *argv[])
 *   Villi workspace VVVVVV
 ******************************/
 
-void *process_thread(void *host, void *portno, void *action) {
-  const char *host_name = (const char *) host;
-  int *port = (int *) portno;
-  char *act = (char *) action;
+void process(const char *host_name, int port, char act) {
+
+
+  switch (act) {
+    case 't':
+      triple(&port, host_name);
+      break;
+    case 'u':
+      // setja UDP hér
+      break;
+    case 's':
+      // setja SYN hér
+      break;
+    default:
+      error("cannot find action!");
+  }
+}
+/*
+void *process_thread(void *arguments) {
+
+  struct arg_struct *args = arguments;
+  const char *host_name = (const char *) args->host;
+  int *port = (int *) args->port;
+  char *act = (char *) args->action;
 
   switch (*act) {
     case 't':
@@ -126,7 +169,7 @@ void *process_thread(void *host, void *portno, void *action) {
 
   return NULL;
 }
-
+*/
 void triple(int *portno, const char *host_name) {
   /*
     Initizialise variables
