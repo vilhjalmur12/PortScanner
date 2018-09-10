@@ -13,6 +13,8 @@
 #include<netinet/ip.h>    //Provides declarations for ip header
 #include<sys/socket.h>
 #include<arpa/inet.h>
+#include<chrono>
+
 
 #include <map>
 #include <unistd.h>
@@ -78,12 +80,13 @@ unsigned short csum(unsigned short *buf,int nwords)
     return (unsigned short) (~sum);
 }
 
-void sendSYN3() {
+void sendSYN() {
     /*
     int raw_sock, data_size;
     int saddr_size;
     struct sockaddr saddr;
     struct in_addr in;
+    unsigned int addr_len;
 
     unsigned char *buffer = (unsigned char *)malloc(65536);
 
@@ -94,49 +97,152 @@ void sendSYN3() {
         exit(-1);
     }
 
+    addr_len = sizeof saddr;
+    data_size = recvfrom(raw_sock, buffer, 65536, 0, &saddr, &addr_len);
 
-    data_size = recvfrom(raw_sock, buffer, 65536, 0, &saddr, sizeof(saddr));
+    debugFunc();
 
+    unsigned short iphdrlen;
+    struct iphdr *iph = (struct iphdr *) buffer;
+    iphdrlen = iph->ihl*4;
+    struct tcphdr *tcph = (struct tcphdr*) (buffer + iphdrlen);
+
+    printf("Source Port: %u\n", tcph->source);
      */
 
-    int saddr_size , data_size;
-    struct sockaddr saddr;
-    struct in_addr in;
-    int sock_raw;
-    struct sockaddr_in source,dest;
+    int destination_port = htons(2500);
+    int source_port = htons(random());
+    char buffer[65536], rbuffer[65536];
+    char string[65536];
+    char *host_source, *host_dest;
+    int dlength = (sizeof(struct tcphdr) + sizeof(struct iphdr));
+    struct hostent *hostentry;
 
-    unsigned char *buffer = (unsigned char *)malloc(65536); //Its Big!
+    struct iphdr *iphdr, *riphdr;
+    struct tcphdr *tcphdr, *rtcphdr;
 
+    struct sockaddr_in sock_addr, dest_addr;
+    struct sockaddr from;
+    int ethlen;
+    socklen_t fromlen;
 
-    printf("Starting...\n");
-    //Create a raw socket that shall sniff
-    sock_raw = socket(AF_INET , SOCK_RAW , IPPROTO_TCP);
-    if(sock_raw < 0)
-    {
-        printf("Socket Error\n");
-        exit(-1);
-    }
-    while(1)
-    {
-        saddr_size = sizeof(saddr);
-        //Receive a packet
-        data_size = recvfrom(sock_raw , buffer , 65536 , 0 , &saddr , saddr_size);
+    host_source = "10.3.26.167";
+    host_dest = "127.0.0.1";
 
-        rec
-        if(data_size <0 )
-        {
-            printf("Recvfrom error , failed to get packets\n");
-            return 1;
-        }
-        //Now process the packet
-        ProcessPacket(buffer , data_size);
+    printf("host_dest: %c", &host_source);
+    // get host source
+    if((hostentry = gethostbyname("10.3.26.167")) == NULL) {
+        error("Error with source address");
     }
 
-    struct tcphdr *tcph=(struct tcphdr*)(buffer + iphdrlen);
+    bzero(&sock_addr, sizeof(struct sockaddr));
+    sock_addr.sin_family = AF_INET;
+    sock_addr.sin_addr = *((struct in_addr *)hostentry->h_addr);
+
+    printf("host_dest: %c", &host_dest);
+    // get host destination
+    if((hostentry = gethostbyname("127.0.0.1")) == NULL) {
+        error("Error with destination address");
+    }
+
+    bzero(&dest_addr, sizeof(struct sockaddr));
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_addr = *((struct in_addr *)hostentry->h_addr);
+
+    
+    //ethlen = sizeof(ethhdr);
+    setvbuf(stdout, NULL, _IONBF, 0);
+    fflush(stdout);
+
+    int s = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+    if(s < 0) { error("Error: error opening socket");
+    }
+
+    int on = 1;
+    
+    if(setsockopt(s, IPPROTO_IP, IP_HDRINCL,(char *)&on, sizeof(on)) < 0) {
+            error("set sock option error");
+    }
+    
+
+    bzero(buffer, 65536);
+
+    // TCP header
+    tcphdr = (struct tcphdr *) (buffer + sizeof(struct iphdr));
+    tcphdr->source = htons(source_port);
+    tcphdr->dest = destination_port;
+    tcphdr->window = htons(65535);
+    tcphdr->seq = random();
+    // Flags
+    tcphdr->syn = 1;
+    tcphdr->ack = 0;
+    tcphdr->rst = 0;
+    tcphdr->psh = 0;
+    tcphdr->urg = 0;
+    tcphdr->fin = 0;
+    tcphdr->doff = sizeof(struct tcphdr) / 4;
+
+    bzero(buffer, sizeof(struct iphdr));
+    iphdr = (struct iphdr *) buffer;
+    iphdr->ihl = 5;
+    iphdr->version = 4;
+    iphdr->tot_len = htons(dlength);
+    iphdr->id = htons(random());
+    iphdr->ttl = IPDEFTTL;
+    iphdr->protocol = IPPROTO_TCP;
+    iphdr->daddr = dest_addr.sin_addr.s_addr;
+    iphdr->saddr = sock_addr.sin_addr.s_addr;
+
+    if(sendto(s, buffer, dlength, 0x0, (struct sockaddr *) &dest_addr, 
+            sizeof(struct sockaddr)) != dlength) {
+        error("socket input");
+    }
+
+    close(s);
+
+    // Recieve part
+    int rs;
+    if((rs = socket(AF_INET, SOCK_PACKET, htons(0x0800))) < 0) {
+        error("rs socket input");
+    }
+
+    if((s = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
+        error("recieve socket error");
+    }
+
+    if (setsockopt(s, IPPROTO_IP, IP_HDRINCL, (char *)&on, sizeof(on)) < 0) {
+        error("sock option error");
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    auto lap = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = lap - start;
+    printf("clock begin %d", elapsed.count());
+    bool found = false;
+
+    while(elapsed.count() < 10 && !found) {
+        
+        if(recvfrom(rs, rbuffer, 65536, 0x0, 
+            (struct sockaddr *) &from, &fromlen) > 0) {
+                riphdr = (struct iphdr *)(rbuffer + ethlen);
+
+                rtcphdr = (struct tcphdr *)(rbuffer + ethlen + sizeof(struct iphdr));
+
+                printf("Protocol from return: %d", rtcphdr->source);
+
+                found = true;
+            }
+
+        lap = std::chrono::high_resolution_clock::now();
+        elapsed = lap - start;
+    }
+   
+   close(rs);
+   close(s);
 }
 
 
-void sendSYN() {
+void sendSYN2() {
 
 
     // init variables
@@ -271,7 +377,7 @@ void sendSYN() {
 
 }
 
-void sendSYN2(struct sockaddr_in serv_addr, struct sockaddr_in socket_addr ,int portnr) {
+void sendSYN3(struct sockaddr_in serv_addr, struct sockaddr_in socket_addr ,int portnr) {
 
     // Initialize header variables
     int SYN = 1;
@@ -335,5 +441,6 @@ void sendSYN2(struct sockaddr_in serv_addr, struct sockaddr_in socket_addr ,int 
     tcphdr->fin =                  fin;				// flag FIN
     tcphdr->doff =                 sizeof(struct tcphdr) / 4;
 
-     */
+*/
+     
 }
