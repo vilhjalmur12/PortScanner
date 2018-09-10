@@ -19,8 +19,11 @@
 /*
 *   Ívar includes
 */
-
-
+#include <netinet/ip_icmp.h>   //Provides declarations for icmp header
+#include <netinet/udp.h>   //Provides declarations for udp header
+#include <netinet/tcp.h>   //Provides declarations for tcp header
+#include <netinet/ip.h>    //Provides declarations for ip header
+#include <arpa/inet.h>
 // Ívar includes - END
 
 
@@ -124,8 +127,74 @@ int main(int argc, char *argv[])
 
 /*****************************
  *  ÍVAR workspace  VVVVV
- **************************** /
+ **************************** */
 
+void upd(struct hostent *server, int *portNumber) {
+    //variables
+    int sockfd = 0, sockfd2 = 0, bytes_sent = 0, bytes_recv = 0;
+    struct sockaddr_in their_addr;
+    //struct hostent *he;
+    struct sockaddr saddr;
+    //unsigned char *buffer[200];
+    unsigned char *buffer = (unsigned char *)malloc(65536); //TEST HARD COPY
+    // ATH
+    struct icmphdr *recv = (struct icmphdr*) (buffer + sizeof(struct iphdr));
+    socklen_t addr_len;
+    
+    //get host info
+    /*if((he = gethostbyname(server) == NULL) {
+        herror("gethostbyname");
+        exit(1);
+    }*/
+    // creating a socket using UDP
+    if((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+        perror("socket");
+        printf("in socket 1 error begin");
+        exit(1);
+    }
+    //added extra socket like on piazza and RAW to recv ICMP error
+    if((sockfd2 = socket(AF_INET, SOCK_RAW|SOCK_NONBLOCK, IPPROTO_ICMP)) < 0) {
+        perror("socket2");
+        printf("in socket 2 error begin");
+        exit(1);
+    }
+    
+    //portnumber
+    int portnum = *portNumber;
+    // host byte order
+    their_addr.sin_family = AF_INET;
+    // short, network byte order
+    their_addr.sin_port = htons(portnum);
+    their_addr.sin_addr = *((struct in_addr *)server->h_addr);
+    // zero the rest of the struct
+    bzero(&(their_addr.sin_zero), 8);
 
+    if((bytes_sent = sendto(sockfd, "\n", 1, 0,(struct sockaddr *)&their_addr, sizeof(struct sockaddr))) < 0) {
+        perror("sendto");
+        close(sockfd);
+        exit(1);
+    }
 
+    printf("sent %d bytes to %s\n", bytes_sent, inet_ntoa(their_addr.sin_addr));
+
+    for(int i = 0; i <= 5; i++) {
+        //here is sockfd2 used                                                                                
+        bytes_recv = recvfrom(sockfd2, buffer, 65536, 0,(struct sockaddr *)&their_addr, &addr_len);
+        if(bytes_recv < 0) {
+            printf("Port %d is open\n", portnum);
+            printf("Recvfrom error, Failed to get the packets\n");
+            continue;
+        }
+        else {
+            //ATH
+            printf("Received:\ttype %d\tcode %d\n", recv->type, recv->code);
+            printf("Port %d is closed\n", portnum);
+            break;
+        }
+
+    }
+
+    close(sockfd);
+    close(sockfd2);
+}
 
