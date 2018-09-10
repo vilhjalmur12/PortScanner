@@ -85,7 +85,6 @@ int main(int argc, char* argv[]) {
         //here is sockfd2 used                                                                                
         bytes_recv = recvfrom(sockfd2, buffer, 65536, 0,(struct sockaddr *)&their_addr, &addr_len);
         if(bytes_recv < 0) {
-            int saddr_size = sizeof(saddr);
             printf("Port %d is open\n", portnum);
             printf("Recvfrom error, Failed to get the packets\n");
             continue;
