@@ -15,6 +15,8 @@
 #include<arpa/inet.h>
 #include<chrono>
 
+#include <iostream>
+using namespace std;
 
 #include <map>
 #include <unistd.h>
@@ -110,7 +112,7 @@ void sendSYN() {
     printf("Source Port: %u\n", tcph->source);
      */
 
-    int destination_port = htons(2500);
+    int destination_port = htons(31313);
     int source_port = htons(random());
     char buffer[65536], rbuffer[65536];
     char string[65536];
@@ -126,28 +128,34 @@ void sendSYN() {
     int ethlen;
     socklen_t fromlen;
 
-    host_source = "10.3.26.167";
-    host_dest = "127.0.0.1";
+    host_source = "10.0.2.15";
+    host_dest = "130.208.243.61";
 
     printf("host_dest: %c", &host_source);
     // get host source
-    if((hostentry = gethostbyname("10.3.26.167")) == NULL) {
+    if((hostentry = gethostbyname(host_source)) == NULL) {
         error("Error with source address");
     }
+
+
 
     bzero(&sock_addr, sizeof(struct sockaddr));
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_addr = *((struct in_addr *)hostentry->h_addr);
 
+    cout << "host address: " << &sock_addr.sin_addr.s_addr << "\n";
+
     printf("host_dest: %c", &host_dest);
     // get host destination
-    if((hostentry = gethostbyname("127.0.0.1")) == NULL) {
+    if((hostentry = gethostbyname(host_dest)) == NULL) {
         error("Error with destination address");
     }
 
     bzero(&dest_addr, sizeof(struct sockaddr));
     dest_addr.sin_family = AF_INET;
     dest_addr.sin_addr = *((struct in_addr *)hostentry->h_addr);
+
+    dest_addr.sin_port = destination_port;
 
     
     //ethlen = sizeof(ethhdr);
@@ -156,6 +164,11 @@ void sendSYN() {
 
     int s = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
     if(s < 0) { error("Error: error opening socket");
+    }
+
+    int rs;
+    if((rs = socket(AF_INET, SOCK_PACKET, htons(0x0800))) < 0) {
+        error("rs socket input");
     }
 
     int on = 1;
@@ -198,13 +211,7 @@ void sendSYN() {
         error("socket input");
     }
 
-    close(s);
-
     // Recieve part
-    int rs;
-    if((rs = socket(AF_INET, SOCK_PACKET, htons(0x0800))) < 0) {
-        error("rs socket input");
-    }
 
     if((s = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0) {
         error("recieve socket error");
@@ -228,7 +235,7 @@ void sendSYN() {
 
                 rtcphdr = (struct tcphdr *)(rbuffer + ethlen + sizeof(struct iphdr));
 
-                printf("Protocol from return: %d", rtcphdr->source);
+                printf("Port from return: %d", rtcphdr->dest);
 
                 found = true;
             }
