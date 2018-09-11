@@ -34,10 +34,12 @@
 #include <arpa/inet.h>
 // Ívar includes - END
 
+void sendSYN(int portno);
 void triple(int *portno, const char *host_name);
 //void *process_thread(void *host, void *portno, void *action);
+void udp(struct hostent *server, int *portNumber);
 void process(const char *host_name, int port, char act);
-
+void sendSYN(struct hostent *hostentry, int portno);
 
 void error(const char *msg)
 {
@@ -53,6 +55,11 @@ struct arg_struct {
 
 int main(int argc, char *argv[])
 {
+    if (argc != 4) {
+        fprintf(stderr,"usage: %s hostname port-low port-high protocol(u = UDP, t = triple handshake, s = SYN)\n", argv[0]);
+        exit(0);
+    }
+
     /*
       Initizialise variables
     */
@@ -130,16 +137,20 @@ int main(int argc, char *argv[])
 
 void process(const char *host_name, int port, char act) {
 
+    struct hostent *serv;
+    if((serv = gethostbyname(host_name)) == NULL) {
+        error("Error with source address");
+    }
 
   switch (act) {
     case 't':
-      triple(&port, host_name);
-      break;
+        triple(&port, host_name);
+        break;
     case 'u':
-      // setja UDP hér
+        udp(serv ,&port);
       break;
     case 's':
-      // setja SYN hér
+      sendSYN(serv, port);
       break;
     default:
       error("cannot find action!");
@@ -222,7 +233,7 @@ void triple(int *portno, const char *host_name) {
  *  ÍVAR workspace  VVVVV
  **************************** */
 
-void upd(struct hostent *server, int *portNumber) {
+void udp(struct hostent *server, int *portNumber) {
     //variables
     int sockfd = 0, sockfd2 = 0, bytes_sent = 0, bytes_recv = 0;
     struct sockaddr_in their_addr;
@@ -289,28 +300,8 @@ void upd(struct hostent *server, int *portNumber) {
     close(sockfd2);
 }
 
-void syn(struct hostent *server, int *portNumber) {
-    /*
-      Initizialise variables
-    */
-    int begin_port = 1025;
-    int end_port = 60000;
-    unsigned int sleeptime = 500000;
-    int portno = *portNumber;
-
-    // Test variables
-
-
-    // bool hash map for which ports are finished
-    std::map<int, bool> port_map;
-    int ports_counted = end_port - begin_port;
-
-    sendSYN(portno);
-}
-
 unsigned short csum(unsigned short *buf,int nwords)
 {
-    //this function returns the checksum of a buffer
     unsigned long sum;
     for (sum = 0; nwords > 0; nwords--){sum += *buf++;}
     sum = (sum >> 16) + (sum & 0xffff);
@@ -318,7 +309,7 @@ unsigned short csum(unsigned short *buf,int nwords)
     return (unsigned short) (~sum);
 }
 
-void sendSYN(int portno) {
+void sendSYN(struct hostent *hostentry, int portno) {
 
     int destination_port = htons(portno);
     int source_port = htons(random());
@@ -326,7 +317,6 @@ void sendSYN(int portno) {
     char string[65536];
     char *host_source, *host_dest;
     int dlength = (sizeof(struct tcphdr) + sizeof(struct iphdr));
-    struct hostent *hostentry;
 
     struct iphdr *iphdr, *riphdr;
     struct tcphdr *tcphdr, *rtcphdr;
@@ -339,21 +329,17 @@ void sendSYN(int portno) {
     host_source = "localhost";
     host_dest = "portno";
 
-    printf("host_dest: %c", &host_source);
-    // get host source
+    printf("host_dest: %c", &host_dest);
+    // get host destination
     if((hostentry = gethostbyname(host_source)) == NULL) {
-        error("Error with source address");
+        error("source address error");
     }
 
     bzero(&sock_addr, sizeof(struct sockaddr));
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_addr = *((struct in_addr *)hostentry->h_addr);
 
-    printf("host_dest: %c", &host_dest);
-    // get host destination
-    if((hostentry = gethostbyname(host_dest)) == NULL) {
-        error("Error with destination address");
-    }
+    
 
     bzero(&dest_addr, sizeof(struct sockaddr));
     dest_addr.sin_family = AF_INET;
@@ -452,157 +438,4 @@ void sendSYN(int portno) {
    close(s);
 }
 
-
-void sendSYN2() {
-
-    // init variables
-    struct sockaddr_in sock_in;
-    unsigned char packetBuf[4096];
-
-    // Createing raw socket
-    //int raw_fd = socket(AF_INET, SOCK_RAW, 6);
-    int raw_fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW); // Open Socket
-
-    if (raw_fd < 0)
-    {
-        printf("ERROR creating raw socket\n");
-        exit(1);
-    }else{
-        printf("Raw Socket Created!		:-D\n");
-    }
-
-    //specify port to bind to
-    bzero((char *)& sock_in,sizeof(sock_in));
-    sock_in.sin_port = htons(2400);
-
-    //re-use socket structure
-    //Details about where this custom packet is going:
-    bzero((char *)& sock_in, sizeof(sock_in));
-    sock_in.sin_family = AF_INET;
-    sock_in.sin_port = htons(2400);	//port to send packet to
-    sock_in.sin_addr.s_addr = inet_addr("127.0.0.1");	//IP to send packet to
-
-    // buffer size
-    unsigned short buffer_size = sizeof(struct ip) + sizeof(struct tcphdr);
-
-    struct ip *IPheader = (struct ip *) packetBuf;
-    struct tcphdr *TCPheader = (struct tcphdr *) (packetBuf + sizeof (struct ip));
-
-    //Fill out IP Header information:
-    IPheader->ip_hl = 5;
-    IPheader->ip_v = 4;		    //IPv4
-    IPheader->ip_tos = 0;		//type of service
-    IPheader->ip_len = htons(buffer_size);	//length
-    IPheader->ip_id = htonl(54321);
-    IPheader->ip_off = 0;
-    IPheader->ip_ttl = 255;	//max routers to pass through
-    IPheader->ip_p = 6;		//tcp
-    IPheader->ip_sum = 0;	//Set to 0 before calulating later
-    IPheader->ip_src.s_addr = inet_addr("123.4.5.6");	//source IP address
-    IPheader->ip_dst.s_addr = inet_addr("127.0.0.1");	//destination IP address
-
-    //Fill out TCP Header information:
-    TCPheader->th_sport = htons(55000);	//source port
-    TCPheader->th_dport = htons(2400);			//destination port
-    TCPheader->th_seq = random();
-    TCPheader->th_ack = 0;	//Only 0 on initial SYN
-    TCPheader->th_off = 0;
-    TCPheader->th_flags = TH_SYN;	//SYN flag set
-    TCPheader->th_win = htonl(65535);	//used for segmentation
-    TCPheader->th_sum = 0;				//Kernel fill this out
-    TCPheader->th_urp = 0;
-
-    // Createing raw socket
-    int sendRaw = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-
-    if (sendRaw < 0)
-    {
-        printf("ERROR creating raw socket for sending.\n");
-        exit(1);
-    }else{
-        printf("Raw socket created for sending!	:-D\n");
-    }
-    int sendErr = sendto(sendRaw,packetBuf,
-                         sizeof(packetBuf),0,(struct sockaddr *)&sock_in,sizeof(sock_in));
-
-    if (sendErr < sizeof(packetBuf))
-    {
-        printf("%d out of %d were sent.\n", sendErr, sizeof(packetBuf));
-        exit(1);
-    }else{
-        printf("< %d Sent message!!\n", sendErr);
-    }
-
-    printf("Sleep for 2 sec\n");
-    sleep(1);
-    printf(".\n");
-    sleep(1);
-    printf(".\n");
-    char recvPacket[4096] = "";
-    int newData = recv(raw_fd,recvPacket,sizeof(recvPacket),0);
-
-
-    struct tcphdr *tcph=(struct tcphdr*)(recvPacket + sizeof (struct ip));
-    printf("Checking tcphdr: %u\n", tcph->th_flags);
-    //printf("Checking tcphdr: %u\n", tcph->);
-
-
-    if (newData <=0)
-    {
-        printf("%d returned by recv!\n", newData);
-        exit(1);
-    }else{
-        printf("<%d> RECIEVE SUCCESSFULL!!\n", newData);
-    }
-
-
-}
-
-void sendSYN3(struct sockaddr_in serv_addr, struct sockaddr_in socket_addr ,int portnr) {
-
-    // Initialize header variables
-    int SYN = 1;
-    int ACK = 0;
-    int RST = 0;
-    int URG = 0;
-    int FIN = 0;
-    int PSH = 0;
-    int dest_port = htons(portnr);
-    int source_port = htons(rand());
-
-    int                 status, i, pid, s;
-    int buff_long = 65536;
-
-    char                buffer[buff_long], rbuffer[buff_long];
-    char                string[buff_long];
-    struct iphdr        *iphdr, *riphdr;
-    struct tcphdr       tcphdr, *rtcphdr;
-    struct sockaddr     from;
-    int                 fromlen, ethlen;
-
-    struct pseudohdr {
-        struct in_addr saddr;
-        struct in_addr daddr;
-        unsigned char zero;
-        unsigned char protocol;
-        unsigned short length;
-    } *pseudoheader;
-
-    //ethlen = sizeof(struct ethhdr);
-    int on = 1;
-    source_port = htons(random());
-    dest_port = htons(dest_port);
-
-    setvbuf(stdout, NULL, _IONBF, 0);
-    fflush(stdout);
-
-    if((pid=fork()) == -1)
-        error("fork");
-
-    if(setsockopt(s, IPPROTO_IP, IP_HDRINCL,(char *)&on,
-                  sizeof(on)) < 0)
-        error("setsockopt");
-
-    bzero(buffer, buff_long);
-}
 
